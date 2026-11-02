@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MeuredContentStatus {
+  PUBLISHED
+  DELETED
+  FLAGGED
+}
+
+enum MeuredVoteTargetType {
+  POST
+  COMMENT
+}
+
+enum MeuredReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+model MeuredCategory {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts MeuredPost[]
+}
+
+model MeuredPost {
+  id              String              @id @default(uuid())
+  authorAuthUserId String
+  categoryId      String?
+  title           String
+  body            String
+  status          MeuredContentStatus @default(PUBLISHED)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  category    MeuredCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments    MeuredComment[]
+  tags        MeuredPostTag[]
+  bookmarks   MeuredPostBookmark[]
+  attachments MeuredPostAttachment[]
+
+  @@index([authorAuthUserId])
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+model MeuredComment {
+  id              String              @id @default(uuid())
+  postId          String
+  authorAuthUserId String
+  parentCommentId String?
+  body            String
+  status          MeuredContentStatus @default(PUBLISHED)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  post   MeuredPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent MeuredComment? @relation("CommentToComment", fields: [parentCommentId], references: [id], onDelete: SetNull)
+  replies MeuredComment[] @relation("CommentToComment")
+
+  @@index([postId])
+  @@index([authorAuthUserId])
+  @@index([createdAt])
+}
+
+model MeuredVote {
+  id         String               @id @default(uuid())
+  targetType MeuredVoteTargetType
+  targetId   String
+  authUserId String
+  value      Int
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([targetType, targetId, authUserId])
+  @@index([authUserId])
+  @@index([targetType, targetId])
+}
+
+model MeuredTag {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  posts MeuredPostTag[]
+}
+
+model MeuredPostTag {
+  id     String @id @default(uuid())
+  postId String
+  tagId  String
+
+  post MeuredPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  MeuredTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@index([tagId])
+}
+
+model MeuredPostBookmark {
+  id        String   @id @default(uuid())
+  authUserId String
+  postId    String
+  createdAt DateTime @default(now())
+
+  post MeuredPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([authUserId, postId])
+  @@index([authUserId])
+}
+
+model MeuredPostAttachment {
+  id        String   @id @default(uuid())
+  postId    String
+  imageId   String
+  createdAt DateTime @default(now())
+
+  post MeuredPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([imageId])
+}
+
+model MeuredReport {
+  id               String             @id @default(uuid())
+  reporterAuthUserId String
+  targetType       MeuredVoteTargetType
+  targetId         String
+  reason           String
+  details          String?
+  status           MeuredReportStatus @default(OPEN)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([reporterAuthUserId])
+  @@index([status])
+  @@index([targetType, targetId])
+}
